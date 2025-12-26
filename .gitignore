@@ -1,0 +1,12 @@
+# Datasets grandes
+datasets/
+
+# Arquivos numpy grandes
+*.npy
+
+# Modelos treinados
+*.pkl
+
+# Ambiente virtual
+venv/
+__pycache__/

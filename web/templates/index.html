@@ -1,0 +1,915 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>FraudGuard AI - Sistema de Detecção de Fraudes</title>
+    
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- jsPDF -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        :root{
+            --bg1: linear-gradient(135deg,#667eea 0%,#764ba2 100%);
+            --card-bg: #fff;
+            --text: #222;
+            --muted: #6b7280;
+            --accent: #667eea;
+            --success: #28a745;
+            --danger: #dc3545;
+            --warning: #ffc107;
+        }
+        body {
+            font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+            min-height: 100vh;
+            background: var(--bg1);
+            color: var(--text);
+            padding: 20px;
+            -webkit-font-smoothing:antialiased;
+        }
+        body.dark {
+            --card-bg: #111216;
+            --text: #e6eef6;
+            --muted: #9aa6b2;
+            --bg1: linear-gradient(135deg,#0f1724 0%,#0b1220 100%);
+        }
+        .container { max-width: 1400px; margin: 0 auto; }
+        header { text-align: center; color: white; margin-bottom: 30px; }
+        header h1 { font-size: 2.6rem; margin-bottom: 6px; text-shadow: 2px 2px 6px rgba(0,0,0,0.25); }
+        header p { font-size: 1.05rem; opacity: .95; }
+        .top-controls { display:flex; align-items:center; justify-content:flex-end; gap:12px; margin-bottom:12px; }
+        #themeToggle, #aboutBtn { padding:8px 10px; border-radius:8px; border:none; cursor:pointer; background:rgba(255,255,255,0.12); color:#fff; }
+        .main-content { display: grid; grid-template-columns: 1fr 1fr; gap: 22px; }
+        .card {
+            background: var(--card-bg);
+            border-radius: 14px;
+            padding: 22px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.15);
+            transform: translateY(12px);
+            opacity: 0;
+            animation: fadeInUp 0.55s ease forwards;
+        }
+        .card h2 { color: var(--accent); margin-bottom: 12px; font-size:1.2rem; display:flex; align-items:center; gap:10px; }
+        @keyframes fadeInUp { to { transform:none; opacity:1; } }
+        .form-group { margin-bottom:14px; }
+        label { display:block; margin-bottom:6px; font-weight:600; color:var(--text); }
+        input, select { width:100%; padding:10px 12px; border-radius:8px; border:1px solid #e6e6e6; font-size:1rem; background: transparent; color: var(--text); }
+        input:focus, select:focus { outline: none; border-color: var(--accent); box-shadow: 0 4px 14px rgba(102,126,234,0.12); }
+        .btn { padding: 12px 16px; border-radius:10px; cursor:pointer; border:none; font-weight:700; }
+        .btn-primary { background: linear-gradient(135deg,#667eea,#764ba2); color:#fff; }
+        .btn-secondary { background:#6c757d; color:#fff; }
+        .btn-ghost { background:transparent; color:var(--accent); border:2px solid rgba(102,126,234,0.12); }
+        .btn:disabled { opacity:.6; cursor:not-allowed; }
+        .canvas-container { border: 2px dashed rgba(102,126,234,0.22); border-radius:10px; padding:12px; background: rgba(255,255,255,0.02); text-align:center; }
+        #digitCanvas { border-radius:8px; background:#fff; display:block; margin:0 auto; cursor:crosshair; border:1px solid #ddd; }
+        .loading { display:none; text-align:center; padding:12px; }
+        .spinner { border:4px solid rgba(0,0,0,0.06); border-top:4px solid var(--accent); border-radius:50%; width:36px; height:36px; animation: spin 1s linear infinite; margin:10px auto; }
+        @keyframes spin{ to { transform: rotate(360deg); } }
+        .results-section { grid-column: 1 / -1; margin-top:12px; }
+        .results-grid { display:grid; grid-template-columns: repeat(auto-fit, minmax(240px,1fr)); gap:16px; margin-top:12px; }
+        .result-card { padding:16px; border-radius:10px; background: linear-gradient(135deg,#f5f7fa 0%,#cfe0f6 100%); text-align:center; }
+        .result-card h3 { color:var(--accent); margin-bottom:8px; font-size:1.05rem; }
+        .result-value { font-size:1.9rem; font-weight:800; margin:10px 0; }
+        .badge { display:inline-block; padding:8px 12px; border-radius:20px; font-weight:700; color:#fff; margin-top:6px; }
+        .badge.success{background:var(--success);} .badge.danger{background:var(--danger);} .badge.warning{background:var(--warning); color:#222;} .badge.info{background:#17a2b8;}
+        .heatbar { height:18px; border-radius:12px; overflow:hidden; background:linear-gradient(90deg,#2ecc71,#f1c40f,#e74c3c); margin:8px 0; }
+        .history { margin-top:12px; }
+        table { width:100%; border-collapse:collapse; font-size:0.95rem; }
+        th,td { padding:8px 10px; border-bottom:1px solid rgba(0,0,0,0.06); color:var(--text); text-align:left; }
+        .small-muted{ font-size:0.85rem; color:var(--muted); }
+        .notif { padding:12px; border-radius:8px; margin-top:12px; display:none; }
+        .notif.fraud { background: rgba(220,53,69,0.12); border:1px solid rgba(220,53,69,0.18); color:var(--danger); animation: pulse 0.8s ease-in-out; }
+        @keyframes pulse { 0%{ transform: translateY(0) } 50%{ transform: translateY(-4px) } 100%{ transform: translateY(0) } }
+        .shake { animation: strongShake .5s; }
+        @keyframes strongShake { 0%,100% { transform: translate(0); } 20%,60% { transform: translate(-8px, 0); } 40%,80% { transform: translate(8px, 0); } }
+        .quick-test { background: #fff3cd; border:2px solid #ffc107; padding:12px; border-radius:10px; margin-bottom:12px; }
+        .quick-test button { background:#ffc107; color:#111; border:none; padding:8px 10px; border-radius:8px; margin:6px; cursor:pointer; font-weight:700; }
+        footer { text-align:center; color:rgba(255,255,255,0.9); margin-top:28px; opacity:0.9; }
+        #aboutModal { display:none; position:fixed; inset:0; background:rgba(0,0,0,0.5); align-items:center; justify-content:center; padding:20px; z-index:999; }
+        .modal-content { background:var(--card-bg); border-radius:12px; padding:22px; max-width:720px; width:100%; box-shadow:0 14px 38px rgba(0,0,0,0.3); max-height:80vh; overflow-y:auto; }
+        #batchResultsTable { margin-top:12px; max-height:300px; overflow-y:auto; }
+        @media (max-width:900px){ .main-content{ grid-template-columns: 1fr; } header h1{ font-size:1.8rem; } }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🛡️ FraudGuard AI</h1>
+            <p>Sistema Inteligente de Detecção de Fraudes Bancárias — v2.0</p>
+        </header>
+
+        <div class="top-controls">
+            <button id="aboutBtn">ℹ️ Sobre</button>
+            <button id="themeToggle">🌙</button>
+        </div>
+
+        <div class="main-content">
+            <!-- Stats Dashboard -->
+            <div class="card" style="grid-column:1/-1; animation-delay:0s;">
+                <h2>📊 Dashboard de Estatísticas</h2>
+                <div class="results-grid">
+                    <div class="result-card">
+                        <h3>Total Análises</h3>
+                        <div class="result-value" id="totalAnalyses">0</div>
+                    </div>
+                    <div class="result-card">
+                        <h3>Fraudes Detectadas</h3>
+                        <div class="result-value" id="fraudsDetected">0</div>
+                    </div>
+                    <div class="result-card">
+                        <h3>Taxa de Fraude</h3>
+                        <div class="result-value" id="fraudRate">0%</div>
+                    </div>
+                    <div class="result-card">
+                        <h3>Score Médio</h3>
+                        <div class="result-value" id="avgScore">0</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Transação -->
+            <div class="card" style="animation-delay:0.05s;">
+                <h2>💳 Análise de Transação</h2>
+                <div class="quick-test">
+                    <strong>⚡ Teste Rápido:</strong>
+                    <div style="margin-top:8px;">
+                        <button onclick="fillSampleData('legit')">Legítima</button>
+                        <button onclick="fillSampleData('fraud')">Fraude</button>
+                        <button onclick="fillSampleData('intl')">Internacional</button>
+                        <button onclick="fillSampleData('odd-time')">Fora do Horário</button>
+                    </div>
+                </div>
+                <form id="transactionForm">
+                    <div class="form-group">
+                        <label for="amount">Valor (MT)</label>
+                        <input id="amount" name="amount" type="number" step="0.01" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="time">Tempo (segundos)</label>
+                        <input id="time" name="time" type="number" value="0" required>
+                    </div>
+                    <div style="display:flex; gap:8px;">
+                        <button id="analyzeBtn" class="btn btn-primary" type="submit">🔍 Analisar</button>
+                        <button id="exportPDFBtn" type="button" class="btn btn-ghost">📄 PDF</button>
+                        <button id="clearHistoryBtn" type="button" class="btn btn-ghost">🧹 Limpar</button>
+                    </div>
+                </form>
+                <div class="loading" id="transactionLoading"><div class="spinner"></div>Analisando...</div>
+                <div class="notif" id="transactionNotif"></div>
+
+                <!-- Histórico -->
+                <div class="history">
+                    <h3 style="margin-top:12px; color:var(--accent)">📚 Histórico</h3>
+                    <select id="filterHistory" onchange="renderHistory()" style="width:auto; margin-bottom:8px;">
+                        <option value="all">Todos</option>
+                        <option value="fraud">Apenas Fraudes</option>
+                        <option value="legit">Apenas Legítimas</option>
+                        <option value="review">Apenas Revisar</option>
+                    </select>
+                    <table id="historyTable"><thead><tr><th>Data</th><th>Valor</th><th>Resultado</th><th>Score</th></tr></thead><tbody></tbody></table>
+                </div>
+            </div>
+
+            <!-- OCR -->
+            <div class="card" style="animation-delay:0.1s;">
+                <h2>✍️ Reconhecimento OCR</h2>
+                <div class="canvas-container">
+                    <canvas id="digitCanvas" width="200" height="200"></canvas>
+                </div>
+                <div style="display:flex; gap:8px; margin-bottom:6px;">
+                    <button id="recognizeBtn" class="btn btn-primary">🔍 Reconhecer</button>
+                    <button id="clearCanvasBtn" class="btn btn-secondary">🗑️ Limpar</button>
+                </div>
+                <div class="loading" id="ocrLoading"><div class="spinner"></div>Reconhecendo...</div>
+                <div id="ocrResult"></div>
+            </div>
+
+            <!-- NOVA: Validação de Cheque -->
+            <div class="card" style="animation-delay:0.15s;">
+                <h2>💵 Validação de Cheque</h2>
+                <div style="background: #e7f3ff; padding: 15px; border-radius: 8px; margin-bottom: 15px; border-left: 4px solid #2196F3;">
+                    <strong>💡 Como funciona:</strong><br>
+                    <small>
+                        1. Digite o valor que o cliente declarou<br>
+                        2. Desenhe o valor do cheque (um dígito em milhares)<br>
+                        3. Sistema compara e detecta fraude se diferente
+                    </small>
+                </div>
+                
+                <div class="form-group">
+                    <label for="checkAmount">Valor Declarado pelo Cliente (MT):</label>
+                    <input type="number" id="checkAmount" step="0.01" placeholder="Ex: 500.00">
+                </div>
+                
+                <div class="canvas-container">
+                    <p style="margin-bottom:8px; font-weight:600; color:var(--text);">Desenhe o valor do cheque:</p>
+                    <canvas id="checkCanvas" width="200" height="200"></canvas>
+                    <p class="small-muted" style="margin-top:6px;">Dica: Desenhe um dígito (será multiplicado por 1000)</p>
+                </div>
+                
+                <div style="display:flex; gap:8px; margin-top:12px;">
+                    <button id="validateCheckBtn" class="btn btn-primary">✅ Validar Cheque</button>
+                    <button id="clearCheckBtn" class="btn btn-secondary">🗑️ Limpar</button>
+                </div>
+                
+                <div class="loading" id="checkLoading"><div class="spinner"></div>Validando cheque...</div>
+                <div id="checkResult"></div>
+            </div>
+        </div>
+
+        <!-- Resultados (FORA do main-content para aparecer abaixo) -->
+        <div class="card results-section" id="resultsSection" style="animation-delay:0.2s; max-width:1400px; margin:22px auto 0;">
+            <h2>📊 Resultados da Análise</h2>
+            <div class="results-grid">
+                <div class="result-card">
+                    <h3>🎯 Classificação</h3>
+                    <div class="result-value" id="classResult">-</div>
+                    <div id="classBadge"></div>
+                    <div class="small-muted" id="classDetails"></div>
+                </div>
+                <div class="result-card">
+                    <h3>📈 Score de Risco</h3>
+                    <div class="result-value" id="riskScore">-</div>
+                    <div id="riskBadge"></div>
+                    <div class="small-muted" id="riskDetails"></div>
+                    <div style="margin-top:12px;">
+                        <div style="height:12px; background:#eee; border-radius:8px; overflow:hidden;">
+                            <div id="riskBar" style="height:100%; width:0%; background:linear-gradient(90deg,#67e8f9,#7c3aed);"></div>
+                        </div>
+                    </div>
+                </div>
+                <div class="result-card">
+                    <h3>🔍 Padrão</h3>
+                    <div class="result-value" id="clusterResult">-</div>
+                    <div id="clusterBadge"></div>
+                    <div class="small-muted" id="clusterDetails"></div>
+                    <div style="margin-top:12px;">
+                        <div class="heatbar"><div id="heatFill" style="width:30%; height:100%;"></div></div>
+                        <div class="small-muted">Heat: <span id="heatPercent">30%</span></div>
+                    </div>
+                </div>
+                <div class="result-card">
+                    <h3>⚖️ Decisão</h3>
+                    <div class="result-value" id="finalDecision">-</div>
+                    <div class="small-muted" id="finalDetails"></div>
+                </div>
+            </div>
+            
+            <!-- Gráfico de Pizza da Classificação -->
+            <div style="margin-top:24px; padding:20px; background:rgba(102,126,234,0.05); border-radius:12px;">
+                <h3 style="color:var(--accent); margin-bottom:12px; text-align:center;">📊 Probabilidades de Classificação</h3>
+                <canvas id="fraudChart" style="max-width:350px; max-height:350px; margin:0 auto; display:block;"></canvas>
+            </div>
+        </div>
+
+        <!-- Análise em Lote -->
+        <div class="card" style="animation-delay:0.25s; max-width:1400px; margin:22px auto;">
+            <h2>📁 Análise em Lote (CSV)</h2>
+            <input type="file" id="csvUpload" accept=".csv" style="margin-bottom:8px;">
+            <button id="analyzeBatchBtn" class="btn btn-primary">🔍 Analisar CSV</button>
+            <div class="loading" id="batchLoading"><div class="spinner"></div>Processando CSV...</div>
+            <div id="batchStats"></div>
+            <div id="batchResultsTable"></div>
+        </div>
+
+        <!-- Tendência -->
+        <div class="card" style="animation-delay:0.3s; max-width:1400px; margin:22px auto;">
+            <h2>📈 Tendência de Risco</h2>
+            <canvas id="trendChart" style="max-height:250px;"></canvas>
+        </div>
+
+        <footer>
+            <p>🎓 FraudGuard AI v2.0 — Integração Completa de IA</p>
+            <p>Amade Xavier dos Santos</p>
+        </footer>
+    </div>
+
+    <!-- Modal Sobre -->
+    <div id="aboutModal">
+        <div class="modal-content">
+            <h2 style="color:var(--accent)">ℹ️ Sobre o FraudGuard AI</h2>
+            <p class="small-muted" style="margin-top:8px;">
+                Sistema integrado com 4 módulos de IA:
+            </p>
+            <ul style="margin:12px 0; padding-left:20px;">
+                <li><strong>Classificação:</strong> Random Forest (F1: 78.3%)</li>
+                <li><strong>Regressão:</strong> Gradient Boosting (Score 0-100)</li>
+                <li><strong>Clustering:</strong> K-Means (2 clusters)</li>
+                <li><strong>Visão:</strong> SVM (Acurácia: 96.13%)</li>
+            </ul>
+            <p class="small-muted"><strong>Novidades v2.0:</strong> Dashboard, análise em lote, exportação PDF, gráficos de tendência!</p>
+            <button id="closeAbout" class="btn btn-primary" style="margin-top:12px;">Fechar</button>
+        </div>
+    </div>
+
+    <script>
+    // ==================== TEMA ====================
+    const themeToggle = document.getElementById('themeToggle');
+    function applyTheme(t) {
+        if (t === 'dark') document.body.classList.add('dark');
+        else document.body.classList.remove('dark');
+        localStorage.setItem('fg_theme', t);
+        themeToggle.textContent = t === 'dark' ? '☀️' : '🌙';
+    }
+    const savedTheme = localStorage.getItem('fg_theme') || 'dark';
+    applyTheme(savedTheme);
+    themeToggle.onclick = () => {
+        const current = document.body.classList.contains('dark') ? 'dark' : 'light';
+        applyTheme(current === 'dark' ? 'light' : 'dark');
+    };
+
+    // ==================== MODAL ====================
+    const aboutBtn = document.getElementById('aboutBtn');
+    const aboutModal = document.getElementById('aboutModal');
+    const closeAbout = document.getElementById('closeAbout');
+    aboutBtn.onclick = () => aboutModal.style.display = 'flex';
+    closeAbout.onclick = () => aboutModal.style.display = 'none';
+    aboutModal.onclick = (e) => { if (e.target === aboutModal) aboutModal.style.display = 'none'; };
+
+    // ==================== CANVAS ====================
+    const canvas = document.getElementById('digitCanvas');
+    const ctx = canvas.getContext('2d');
+    ctx.fillStyle = '#fff';
+    ctx.fillRect(0,0,canvas.width,canvas.height);
+    ctx.strokeStyle = '#000';
+    ctx.lineWidth = 15;
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    let drawing=false, lastX=0, lastY=0;
+
+    function getPointer(e){
+        const rect = canvas.getBoundingClientRect();
+        if (e.touches) {
+            const t = e.touches[0];
+            return {x: t.clientX - rect.left, y: t.clientY - rect.top};
+        }
+        return {x: e.offsetX, y: e.offsetY};
+    }
+    canvas.addEventListener('pointerdown', (e)=>{ drawing=true; const p=getPointer(e); lastX=p.x; lastY=p.y; });
+    canvas.addEventListener('pointermove', (e)=>{ if(!drawing) return; const p=getPointer(e); ctx.beginPath(); ctx.moveTo(lastX,lastY); ctx.lineTo(p.x,p.y); ctx.stroke(); lastX=p.x; lastY=p.y; });
+    canvas.addEventListener('pointerup', ()=> drawing=false);
+    canvas.addEventListener('pointerleave', ()=> drawing=false);
+
+    document.getElementById('clearCanvasBtn').onclick = () => {
+        ctx.clearRect(0,0,canvas.width,canvas.height);
+        ctx.fillStyle = '#fff';
+        ctx.fillRect(0,0,canvas.width,canvas.height);
+        document.getElementById('ocrResult').innerHTML = '';
+    };
+
+    // ==================== CANVAS PARA CHEQUE ====================
+    const checkCanvas = document.getElementById('checkCanvas');
+    const checkCtx = checkCanvas.getContext('2d');
+    checkCtx.fillStyle = '#fff';
+    checkCtx.fillRect(0,0,checkCanvas.width,checkCanvas.height);
+    checkCtx.strokeStyle = '#000';
+    checkCtx.lineWidth = 15;
+    checkCtx.lineCap = 'round';
+    checkCtx.lineJoin = 'round';
+    let checkDrawing=false, checkLastX=0, checkLastY=0;
+
+    function getCheckPointer(e){
+        const rect = checkCanvas.getBoundingClientRect();
+        if (e.touches) {
+            const t = e.touches[0];
+            return {x: t.clientX - rect.left, y: t.clientY - rect.top};
+        }
+        return {x: e.offsetX, y: e.offsetY};
+    }
+    
+    checkCanvas.addEventListener('pointerdown', (e)=>{ 
+        checkDrawing=true; 
+        const p=getCheckPointer(e); 
+        checkLastX=p.x; 
+        checkLastY=p.y; 
+    });
+    
+    checkCanvas.addEventListener('pointermove', (e)=>{ 
+        if(!checkDrawing) return; 
+        const p=getCheckPointer(e); 
+        checkCtx.beginPath(); 
+        checkCtx.moveTo(checkLastX,checkLastY); 
+        checkCtx.lineTo(p.x,p.y); 
+        checkCtx.stroke(); 
+        checkLastX=p.x; 
+        checkLastY=p.y; 
+    });
+    
+    checkCanvas.addEventListener('pointerup', ()=> checkDrawing=false);
+    checkCanvas.addEventListener('pointerleave', ()=> checkDrawing=false);
+
+    document.getElementById('clearCheckBtn').onclick = () => {
+        checkCtx.clearRect(0,0,checkCanvas.width,checkCanvas.height);
+        checkCtx.fillStyle = '#fff';
+        checkCtx.fillRect(0,0,checkCanvas.width,checkCanvas.height);
+        document.getElementById('checkResult').innerHTML = '';
+    };
+
+    // ==================== VALIDAR CHEQUE ====================
+    document.getElementById('validateCheckBtn').onclick = async () => {
+        const declaredAmount = parseFloat(document.getElementById('checkAmount').value);
+        
+        if (isNaN(declaredAmount) || declaredAmount <= 0) {
+            alert('Digite um valor válido declarado pelo cliente!');
+            return;
+        }
+        
+        const dataURL = checkCanvas.toDataURL('image/png');
+        const loading = document.getElementById('checkLoading');
+        loading.style.display = 'block';
+        document.getElementById('checkResult').innerHTML = '';
+
+        try {
+            const res = await fetch('/api/validate_check', {
+                method:'POST', 
+                headers:{'Content-Type':'application/json'}, 
+                body: JSON.stringify({
+                    image: dataURL,
+                    amount: declaredAmount
+                })
+            });
+            
+            const json = await res.json();
+            
+            if (json.success) {
+                const isFraud = json.is_fraud;
+                const bgColor = isFraud ? '#f8d7da' : '#d4edda';
+                const textColor = isFraud ? '#721c24' : '#155724';
+                const icon = isFraud ? '🚨' : '✅';
+                const title = isFraud ? 'FRAUDE DETECTADA!' : 'Valores Correspondem!';
+                
+                document.getElementById('checkResult').innerHTML = `
+                    <div style="background:${bgColor};padding:16px;border-radius:8px;margin-top:12px;border:2px solid ${isFraud ? '#f5c6cb' : '#c3e6cb'};">
+                        <h3 style="color:${textColor};margin-bottom:10px;">${icon} ${title}</h3>
+                        <div style="background:rgba(255,255,255,0.3); padding:12px; border-radius:6px; margin-top:8px;">
+                            <strong>Análise do Cheque:</strong><br>
+                            • Dígito lido: <strong>${json.digit_read}</strong><br>
+                            • Valor no cheque: <strong>${json.amount_read.toLocaleString()} MT</strong><br>
+                            • Valor declarado: <strong>${json.amount_declared.toLocaleString()} MT</strong><br>
+                            • Diferença: <strong>${json.difference.toLocaleString()} MT</strong><br>
+                            • Confiança OCR: <strong>${(json.confidence*100).toFixed(2)}%</strong>
+                        </div>
+                        ${isFraud ? `
+                            <div style="margin-top:12px; padding:10px; background:rgba(220,53,69,0.2); border-radius:6px;">
+                                <strong>⚠️ AÇÃO RECOMENDADA:</strong> Bloquear transação e notificar equipe de segurança!
+                            </div>
+                        ` : `
+                            <div style="margin-top:12px; padding:10px; background:rgba(40,167,69,0.2); border-radius:6px;">
+                                <strong>✅ AÇÃO:</strong> Transação pode ser processada normalmente.
+                            </div>
+                        `}
+                    </div>
+                `;
+                
+                // Se fraude, adicionar animação
+                if (isFraud) {
+                    const resultDiv = document.getElementById('checkResult');
+                    resultDiv.classList.add('shake');
+                    setTimeout(() => resultDiv.classList.remove('shake'), 600);
+                }
+                
+            } else {
+                document.getElementById('checkResult').innerHTML = `
+                    <div style="background:#f8d7da;padding:12px;border-radius:8px;margin-top:12px;">
+                        ❌ ${json.error}
+                    </div>
+                `;
+            }
+        } catch (err) {
+            document.getElementById('checkResult').innerHTML = `
+                <div style="background:#f8d7da;padding:12px;border-radius:8px;margin-top:12px;">
+                    ❌ Erro: ${err.message}
+                </div>
+            `;
+        } finally {
+            loading.style.display = 'none';
+        }
+    };
+
+    // ==================== OCR ====================
+    document.getElementById('recognizeBtn').onclick = async () => {
+        const dataURL = canvas.toDataURL('image/png');
+        const loading = document.getElementById('ocrLoading');
+        loading.style.display = 'block';
+        document.getElementById('ocrResult').innerHTML = '';
+
+        try {
+            const res = await fetch('/api/recognize_digit', {
+                method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({image: dataURL})
+            });
+            const json = await res.json();
+            if (json.success) {
+                document.getElementById('ocrResult').innerHTML = `
+                    <div style="background:#d4edda;padding:14px;border-radius:8px;margin-top:12px;">
+                        <h3 style="color:#155724;">✅ Dígito: ${json.digit}</h3>
+                        <div class="small-muted">Confiança: ${(json.confidence*100).toFixed(2)}% • ${json.model_name}</div>
+                    </div>
+                `;
+            } else {
+                document.getElementById('ocrResult').innerHTML = `<div style="background:#f8d7da;padding:12px;border-radius:8px;">❌ ${json.error}</div>`;
+            }
+        } catch (err) {
+            document.getElementById('ocrResult').innerHTML = `<div style="background:#f8d7da;padding:12px;border-radius:8px;">❌ ${err.message}</div>`;
+        } finally {
+            loading.style.display = 'none';
+        }
+    };
+
+    // ==================== HISTÓRICO ====================
+    function loadHistory(){ return JSON.parse(localStorage.getItem('fg_history') || '[]'); }
+    function saveHistory(h){ localStorage.setItem('fg_history', JSON.stringify(h)); }
+    function addHistory(entry){
+        const h = loadHistory();
+        h.unshift(entry);
+        if (h.length > 100) h.pop();
+        saveHistory(h);
+        renderHistory();
+        updateStats();
+        updateTrendChart();
+    }
+    function clearHistory(){
+        localStorage.removeItem('fg_history');
+        renderHistory();
+        updateStats();
+        updateTrendChart();
+    }
+    document.getElementById('clearHistoryBtn').onclick = clearHistory;
+
+    function renderHistory(){
+        const tbody = document.querySelector('#historyTable tbody');
+        tbody.innerHTML = '';
+        let h = loadHistory();
+        const filter = document.getElementById('filterHistory').value;
+        
+        if (filter !== 'all') {
+            h = h.filter(row => {
+                if (filter === 'fraud') return row.result === 'FRAUDE';
+                if (filter === 'legit') return row.result === 'LEGÍTIMA';
+                if (filter === 'review') return row.result === 'REVISAR';
+                return true;
+            });
+        }
+        
+        if (h.length===0){
+            tbody.innerHTML = '<tr><td colspan="4" class="small-muted">Nenhum histórico</td></tr>';
+            return;
+        }
+        h.forEach(row=>{
+            const icon = row.result === 'FRAUDE' ? '🚨' : row.result === 'REVISAR' ? '⚠️' : '✅';
+            const tr = document.createElement('tr');
+            tr.innerHTML = `<td>${new Date(row.time).toLocaleString()}</td><td>${row.amount.toLocaleString()}</td><td>${icon} ${row.result}</td><td>${row.score}</td>`;
+            tbody.appendChild(tr);
+        });
+    }
+
+    function updateStats() {
+        const history = loadHistory();
+        const total = history.length;
+        const frauds = history.filter(h => h.result === 'FRAUDE').length;
+        const fraudRate = total > 0 ? (frauds / total * 100).toFixed(1) : 0;
+        const scores = history.map(h => parseFloat(h.score)).filter(s => !isNaN(s));
+        const avgScore = scores.length > 0 ? (scores.reduce((a,b) => a+b, 0) / scores.length).toFixed(2) : 0;
+        
+        document.getElementById('totalAnalyses').textContent = total;
+        document.getElementById('fraudsDetected').textContent = frauds;
+        document.getElementById('fraudRate').textContent = fraudRate + '%';
+        document.getElementById('avgScore').textContent = avgScore;
+    }
+
+    // ==================== GRÁFICO TENDÊNCIA ====================
+    let trendChart = null;
+    function updateTrendChart() {
+        const history = loadHistory().slice(0, 20).reverse();
+        const labels = history.map(h => new Date(h.time).toLocaleTimeString());
+        const scores = history.map(h => parseFloat(h.score) || 0);
+        
+        const ctx = document.getElementById('trendChart').getContext('2d');
+        if (trendChart) trendChart.destroy();
+        
+        trendChart = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: labels,
+                datasets: [{
+                    label: 'Score de Risco',
+                    data: scores,
+                    borderColor: '#667eea',
+                    backgroundColor: 'rgba(102, 126, 234, 0.1)',
+                    tension: 0.4,
+                    fill: true
+                }]
+            },
+            options: {
+                responsive: true,
+                plugins: { legend: { display: false } },
+                scales: { y: { beginAtZero: true, max: 100 } }
+            }
+        });
+    }
+
+    // ==================== TRANSAÇÃO ====================
+    const SAMPLE_DATA = {
+        legit: {
+            amount: 67.89, time: 45000,
+            V1: -1.36, V2: -0.07, V3: 2.54, V4: 1.38, V5: -0.34, V6: 0.46, V7: 0.24, V8: 0.10, V9: 0.36, V10: 0.09,
+            V11: -0.55, V12: -0.62, V13: -0.99, V14: -0.31, V15: 1.47, V16: -0.47, V17: 0.21, V18: 0.03, V19: 0.40, V20: 0.25,
+            V21: -0.02, V22: 0.28, V23: -0.11, V24: 0.07, V25: 0.13, V26: -0.19, V27: 0.13, V28: -0.02
+        },
+        fraud: {
+            amount: 1.00, time: 82000,
+            V1: -2.31, V2: 1.95, V3: -1.61, V4: 2.99, V5: -0.52, V6: -1.43, V7: -2.54, V8: 1.39, V9: -2.77, V10: -2.77,
+            V11: 2.20, V12: -2.90, V13: -0.60, V14: -3.29, V15: 0.39, V16: -1.27, V17: -2.70, V18: 0.53, V19: 0.25, V20: 0.77,
+            V21: 0.91, V22: -0.69, V23: -0.33, V24: -0.14, V25: -0.06, V26: 0.25, V27: -0.04, V28: 0.01
+        },
+        intl: {
+            amount: 1200.00, time: 30000,
+            V1: -1.80, V2: 1.20, V3: -0.90, V4: 2.10, V5: -0.30, V6: -0.80, V7: -1.50, V8: 0.70, V9: -1.20, V10: -1.50,
+            V11: 1.80, V12: -1.90, V13: -0.40, V14: -2.50, V15: 0.60, V16: -0.90, V17: -1.80, V18: 0.40, V19: 0.30, V20: 0.50,
+            V21: 0.60, V22: -0.40, V23: -0.20, V24: -0.10, V25: 0.10, V26: 0.20, V27: 0.10, V28: 0.00
+        },
+        'odd-time': {
+            amount: 350.00, time: 200000,
+            V1: -0.90, V2: 0.60, V3: 0.30, V4: 1.20, V5: -0.20, V6: 0.30, V7: -0.80, V8: 0.40, V9: -0.60, V10: 0.50,
+            V11: 0.80, V12: -0.90, V13: 0.20, V14: -1.20, V15: 0.40, V16: -0.40, V17: -0.80, V18: 0.20, V19: 0.20, V20: 0.30,
+            V21: 0.30, V22: -0.20, V23: -0.10, V24: 0.10, V25: 0.10, V26: 0.10, V27: 0.00, V28: 0.10
+        }
+    };
+
+    function fillSampleData(type){
+        const sample = SAMPLE_DATA[type];
+        if (!sample) {
+            console.error('Tipo de amostra inválido:', type);
+            return;
+        }
+        document.getElementById('amount').value = sample.amount;
+        document.getElementById('time').value = sample.time;
+        window.currentSample = sample;
+        console.log('Dados de exemplo carregados:', type, sample);
+    }
+    window.fillSampleData = fillSampleData;
+
+    document.getElementById('transactionForm').addEventListener('submit', async (e)=>{
+        e.preventDefault();
+        document.getElementById('transactionNotif').style.display = 'none';
+        document.getElementById('analyzeBtn').disabled = true;
+        document.getElementById('transactionLoading').style.display = 'block';
+        // NÃO esconder resultsSection aqui! Remover linha abaixo:
+        // document.getElementById('resultsSection').style.display = 'none';
+
+        const amount = parseFloat(document.getElementById('amount').value || 0);
+        const time = parseFloat(document.getElementById('time').value || 0);
+
+        let data;
+        if (window.currentSample) {
+            data = { ...window.currentSample };
+            data.Amount_scaled = (amount - 88)/250;
+            data.Time_scaled = (time - 94814)/47488;
+            window.currentSample = null;
+        } else {
+            data = { Amount_scaled: (amount - 88)/250, Time_scaled: (time - 94814)/47488 };
+            for (let i=1;i<=28;i++) data['V'+i] = (Math.random() - 0.5) * 0.5;
+        }
+
+        try {
+            const res = await fetch('/api/analyze_transaction', {
+                method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(data)
+            });
+            const json = await res.json();
+            if (!json.success) throw new Error(json.error || 'Erro');
+
+            displayResults(json);
+
+            const resultLabel = (json.classification && json.classification.class===1) ? 'FRAUDE' :
+                                (json.regression && json.regression.risk_score>60) ? 'REVISAR' : 'LEGÍTIMA';
+            addHistory({ 
+                time: Date.now(), 
+                amount: amount, 
+                result: resultLabel, 
+                score: json.regression ? json.regression.risk_score.toFixed(2) : '-' 
+            });
+
+            const notif = document.getElementById('transactionNotif');
+            if (json.classification && json.classification.class===1) {
+                notif.className = 'notif fraud';
+                notif.style.display = 'block';
+                notif.textContent = '🚨 FRAUDE DETECTADA!';
+                const rs = document.getElementById('resultsSection');
+                rs.classList.remove('shake'); void rs.offsetWidth; rs.classList.add('shake');
+            } else {
+                notif.className = 'notif';
+                notif.style.display = 'block';
+                notif.textContent = '✅ Transação analisada';
+                setTimeout(()=> notif.style.display = 'none', 3000);
+            }
+
+        } catch (err) {
+            alert('Erro: ' + err.message);
+        } finally {
+            document.getElementById('analyzeBtn').disabled = false;
+            document.getElementById('transactionLoading').style.display = 'none';
+        }
+    });
+
+    // ==================== DISPLAY RESULTS ====================
+    let fraudChart = null;
+    function ensureFraudChart(){
+        const ctx = document.getElementById('fraudChart').getContext('2d');
+        if (fraudChart) fraudChart.destroy();
+        fraudChart = new Chart(ctx, {
+            type:'doughnut',
+            data: { labels:['Legítima','Fraude'], datasets:[{ data:[50,50], backgroundColor:['#34d399','#ef4444'] }] },
+            options:{ plugins:{legend:{display:true,position:'bottom'}}, maintainAspectRatio:true }
+        });
+    }
+    ensureFraudChart();
+
+    function displayResults(result){
+        try {
+            console.log('DisplayResults chamado com:', result);
+            
+            // Classificação
+            if (result.classification){
+                const cls = result.classification;
+                console.log('Processando classificação:', cls);
+                document.getElementById('classResult').textContent = cls.prediction || '-';
+                document.getElementById('classBadge').innerHTML = `<span class="badge ${cls.class===1 ? 'danger' : 'success'}">${cls.class===1 ? '🚨 FRAUDE' : '✅ LEGÍTIMA'}</span>`;
+                document.getElementById('classDetails').innerHTML = `Prob. fraude: ${(cls.fraud_probability*100).toFixed(2)}% • ${cls.model_name || 'Unknown'}`;
+
+                const fraudPct = Math.round((cls.fraud_probability || 0) * 100);
+                if (fraudChart) {
+                    fraudChart.data.datasets[0].data = [100 - fraudPct, fraudPct];
+                    fraudChart.update();
+                }
+            }
+
+            // Regressão
+            if (result.regression){
+                const reg = result.regression;
+                console.log('Processando regressão:', reg);
+                document.getElementById('riskScore').textContent = reg.risk_score ? reg.risk_score.toFixed(2) : '-';
+                document.getElementById('riskBadge').innerHTML = `<span class="badge ${reg.risk_class || 'info'}">${reg.risk_emoji || '🟡'} ${reg.risk_category || 'N/A'}</span>`;
+                document.getElementById('riskDetails').textContent = `Modelo: ${reg.model_name || 'Unknown'}`;
+                const w = Math.min(100, Math.max(0, reg.risk_score || 0));
+                document.getElementById('riskBar').style.width = w + '%';
+            }
+
+            // Clustering
+            if (result.clustering){
+                const cl = result.clustering;
+                console.log('Processando clustering:', cl);
+                document.getElementById('clusterResult').textContent = `Cluster ${cl.cluster}`;
+                document.getElementById('clusterBadge').innerHTML = `<span class="badge ${cl.risk_level === 'HIGH' ? 'danger' : cl.risk_level === 'MEDIUM' ? 'warning' : 'success'}">${cl.risk_level || 'UNKNOWN'}</span>`;
+                document.getElementById('clusterDetails').innerHTML = `Taxa: ${(cl.fraud_rate || 0).toFixed(2)}% • Tam: ${cl.cluster_size || 0}`;
+
+                const heat = Math.min(100, Math.max(0, cl.fraud_rate || 0));
+                document.getElementById('heatFill').style.width = heat + '%';
+                document.getElementById('heatPercent').textContent = `${Math.round(heat)}%`;
+            }
+
+            // Decisão Final
+            let decision = '✅ APROVAR', details = 'Transação segura.', decClass = 'success';
+            if (result.classification && result.classification.class === 1){
+                decision = '🚨 BLOQUEAR'; details = 'Fraude detectada!'; decClass='danger';
+            } else if (result.regression && result.regression.risk_score > 60){
+                decision = '⚠️ REVISAR'; details = 'Alto risco. Verificar.'; decClass='warning';
+            }
+            document.getElementById('finalDecision').innerHTML = `<span class="badge ${decClass}">${decision}</span>`;
+            document.getElementById('finalDetails').textContent = details;
+
+            // Scroll suave para os resultados (REMOVIDO - comentado)
+            // console.log('Fazendo scroll para resultados');
+            // document.getElementById('resultsSection').scrollIntoView({behavior:'smooth'});
+            
+            console.log('DisplayResults concluído com sucesso');
+        } catch (error) {
+            console.error('ERRO em displayResults:', error);
+            console.error('Stack:', error.stack);
+            alert('Erro ao exibir resultados: ' + error.message);
+        }
+    }
+
+    // ==================== EXPORTAR PDF ====================
+    document.getElementById('exportPDFBtn').onclick = () => {
+        const { jsPDF } = window.jspdf;
+        const doc = new jsPDF();
+        
+        doc.setFontSize(20);
+        doc.text('FraudGuard AI - Relatorio', 20, 20);
+        
+        doc.setFontSize(12);
+        const classResult = document.getElementById('classResult').textContent;
+        const riskScore = document.getElementById('riskScore').textContent;
+        const cluster = document.getElementById('clusterResult').textContent;
+        const decision = document.getElementById('finalDecision').textContent;
+        
+        doc.text(`Classificacao: ${classResult}`, 20, 40);
+        doc.text(`Score de Risco: ${riskScore}`, 20, 50);
+        doc.text(`Cluster: ${cluster}`, 20, 60);
+        doc.text(`Decisao: ${decision}`, 20, 70);
+        doc.text(`Data: ${new Date().toLocaleString()}`, 20, 80);
+        doc.text(`Gerado por: FraudGuard AI v2.0`, 20, 90);
+        
+        doc.save('fraudguard-relatorio.pdf');
+    };
+
+    // ==================== ANÁLISE EM LOTE ====================
+    document.getElementById('analyzeBatchBtn').onclick = async () => {
+        const fileInput = document.getElementById('csvUpload');
+        if (!fileInput.files.length) {
+            alert('Selecione um arquivo CSV primeiro!');
+            return;
+        }
+
+        const formData = new FormData();
+        formData.append('file', fileInput.files[0]);
+
+        const loading = document.getElementById('batchLoading');
+        loading.style.display = 'block';
+        document.getElementById('batchStats').innerHTML = '';
+        document.getElementById('batchResultsTable').innerHTML = '';
+
+        try {
+            const res = await fetch('/api/analyze_batch', {
+                method: 'POST',
+                body: formData
+            });
+            const json = await res.json();
+
+            if (!json.success) throw new Error(json.error);
+
+            // Exibir estatísticas
+            const stats = json.stats;
+            document.getElementById('batchStats').innerHTML = `
+                <div style="background:#d4edda; padding:14px; border-radius:8px; margin-top:12px;">
+                    <h3 style="color:#155724;">✅ Análise Concluída</h3>
+                    <div style="display:grid; grid-template-columns:repeat(3,1fr); gap:12px; margin-top:8px;">
+                        <div><strong>Total:</strong> ${stats.total}</div>
+                        <div><strong>Fraudes:</strong> ${stats.frauds_detected}</div>
+                        <div><strong>Taxa:</strong> ${stats.fraud_rate.toFixed(2)}%</div>
+                    </div>
+                    <div style="margin-top:8px;"><strong>Score Médio:</strong> ${stats.avg_risk_score.toFixed(2)}</div>
+                </div>
+            `;
+
+            // Exibir tabela de resultados
+            let tableHTML = `
+                <table style="width:100%; margin-top:12px; font-size:0.9rem;">
+                    <thead><tr><th>#</th><th>Valor</th><th>Resultado</th><th>Prob. Fraude</th><th>Score</th><th>Cluster</th></tr></thead>
+                    <tbody>
+            `;
+
+            json.results.slice(0, 50).forEach(r => {
+                if (r.error) {
+                    tableHTML += `<tr><td>${r.index}</td><td colspan="5" style="color:red;">Erro: ${r.error}</td></tr>`;
+                } else {
+                    const icon = r.prediction === 'Fraude' ? '🚨' : '✅';
+                    tableHTML += `
+                        <tr>
+                            <td>${r.index}</td>
+                            <td>${r.amount.toFixed(2)}</td>
+                            <td>${icon} ${r.prediction}</td>
+                            <td>${(r.fraud_probability * 100).toFixed(2)}%</td>
+                            <td>${r.risk_score.toFixed(2)}</td>
+                            <td>C${r.cluster}</td>
+                        </tr>
+                    `;
+                }
+            });
+
+            tableHTML += `</tbody></table>`;
+            if (json.results.length > 50) {
+                tableHTML += `<p class="small-muted" style="margin-top:8px;">Mostrando primeiras 50 de ${json.results.length} transações</p>`;
+            }
+
+            document.getElementById('batchResultsTable').innerHTML = tableHTML;
+
+        } catch (err) {
+            document.getElementById('batchStats').innerHTML = `
+                <div style="background:#f8d7da; padding:12px; border-radius:8px; margin-top:12px;">
+                    ❌ Erro: ${err.message}
+                </div>
+            `;
+        } finally {
+            loading.style.display = 'none';
+        }
+    };
+
+    // ==================== INICIALIZAÇÃO ====================
+    renderHistory();
+    updateStats();
+    updateTrendChart();
+
+    // Seed inicial (opcional)
+    if (!localStorage.getItem('fg_history_seeded')) {
+        addHistory({ time: Date.now()-3600000, amount: 15000, result: 'FRAUDE', score: 89.45 });
+        addHistory({ time: Date.now()-7200000, amount: 45.5, result: 'LEGÍTIMA', score: 5.2 });
+        addHistory({ time: Date.now()-10800000, amount: 1200, result: 'REVISAR', score: 65.8 });
+        localStorage.setItem('fg_history_seeded', '1');
+    }
+
+    </script>
+</body>
+</html>

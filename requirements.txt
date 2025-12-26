@@ -1,0 +1,28 @@
+# Data Science & ML
+numpy==1.24.3
+pandas==2.0.3
+scikit-learn==1.3.0
+matplotlib==3.7.2
+seaborn==0.12.2
+scipy==1.11.1
+
+# Deep Learning
+tensorflow==2.13.0
+keras==2.13.1
+
+# Image Processing
+Pillow==10.0.0
+opencv-python==4.8.0.74
+
+# Web Framework
+Flask==2.3.3
+Flask-CORS==4.0.0
+
+# Utilities
+joblib==1.3.2
+tqdm==4.66.1
+imbalanced-learn==0.11.0
+
+# Jupyter (opcional, para notebooks)
+jupyter==1.0.0
+ipykernel==6.25.0

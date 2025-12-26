@@ -1,0 +1,55 @@
+{
+    "model_name": "K-Means (K=2)",
+    "metrics": {
+        "silhouette_score": 0.71649073658035,
+        "davies_bouldin_score": 0.8959281216842065,
+        "calinski_harabasz_score": 2579.241518243414
+    },
+    "n_clusters": 2,
+    "cluster_info": {
+        "0": {
+            "size": 10290,
+            "fraud_count": 291,
+            "fraud_rate": 0.0282798833819242,
+            "risk_level": "MEDIUM"
+        },
+        "1": {
+            "size": 202,
+            "fraud_count": 201,
+            "fraud_rate": 0.995049504950495,
+            "risk_level": "HIGH"
+        }
+    },
+    "feature_names": [
+        "V1",
+        "V2",
+        "V3",
+        "V4",
+        "V5",
+        "V6",
+        "V7",
+        "V8",
+        "V9",
+        "V10",
+        "V11",
+        "V12",
+        "V13",
+        "V14",
+        "V15",
+        "V16",
+        "V17",
+        "V18",
+        "V19",
+        "V20",
+        "V21",
+        "V22",
+        "V23",
+        "V24",
+        "V25",
+        "V26",
+        "V27",
+        "V28",
+        "Amount_scaled",
+        "Time_scaled"
+    ]
+}
